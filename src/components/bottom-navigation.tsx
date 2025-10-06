@@ -3,7 +3,7 @@ import { Home, Gamepad2, TrendingUp, Crown, Settings } from "lucide-react";
 import { useLocation, Link } from "react-router-dom";
 
 const navigationItems = [
-  { icon: Home, label: 'Início', path: '/' },
+  { icon: Home, label: 'Início', path: '/dashboard' },
   { icon: Gamepad2, label: 'Jogos', path: '/games' },
   { icon: TrendingUp, label: 'Sinais', path: '/signals' },
   { icon: Crown, label: 'VIP', path: '/vip-signals' },
@@ -12,6 +12,15 @@ const navigationItems = [
 
 export const BottomNavigation = () => {
   const location = useLocation();
+
+  // Hide bottom navigation on public pages and checkout flow
+  const publicPages = ['/', '/login', '/register', '/plans'];
+  const isPublicPage = publicPages.includes(location.pathname);
+  const isCheckoutPage = location.pathname.startsWith('/checkout');
+
+  if (isPublicPage || isCheckoutPage) {
+    return null;
+  }
 
   return (
     <div className="fixed bottom-0 left-0 right-0 bg-gradient-primary h-20 border-t border-border/50 z-50">

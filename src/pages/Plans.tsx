@@ -268,7 +268,7 @@ export const Plans = () => {
 
             <Card className="border-border bg-card/50">
               <CardContent className="p-6">
-                <h4 className="font-semibent text-foreground mb-2">
+                <h4 className="font-semibold text-foreground mb-2">
                   Como recebo os sinais?
                 </h4>
                 <p className="text-sm text-muted-foreground">
