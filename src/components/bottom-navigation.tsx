@@ -3,7 +3,7 @@ import { Home, Gamepad2, TrendingUp, Crown, Settings } from "lucide-react";
 import { useLocation, Link } from "react-router-dom";
 
 const navigationItems = [
-  { icon: Home, label: 'Início', path: '/' },
+  { icon: Home, label: 'Início', path: '/dashboard' },
   { icon: Gamepad2, label: 'Jogos', path: '/games' },
   { icon: TrendingUp, label: 'Sinais', path: '/signals' },
   { icon: Crown, label: 'VIP', path: '/vip-signals' },
