@@ -13,6 +13,15 @@ const navigationItems = [
 export const BottomNavigation = () => {
   const location = useLocation();
 
+  // Hide bottom navigation on public pages and checkout flow
+  const publicPages = ['/', '/login', '/register', '/plans'];
+  const isPublicPage = publicPages.includes(location.pathname);
+  const isCheckoutPage = location.pathname.startsWith('/checkout');
+
+  if (isPublicPage || isCheckoutPage) {
+    return null;
+  }
+
   return (
     <div className="fixed bottom-0 left-0 right-0 bg-gradient-primary h-20 border-t border-border/50 z-50">
       <div className="flex items-center justify-around h-full px-4">
