@@ -1,26 +1,36 @@
-import { useSimulation } from "@/hooks/useSimulation";
+import { useEffect, useState } from "react";
 import { SignalCard } from "@/components/signal-card";
 import { Button } from "@/components/ui/button";
-import { RefreshCw, TrendingUp, Filter } from "lucide-react";
+import { RefreshCw, Filter } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useState } from "react";
-import { Signal } from "@/types";
+import { useAuth } from "@/contexts/AuthContext";
+import { useSimulation } from "@/hooks/useSimulation";
 
 export const Signals = () => {
-  const { houses, games, signals, isLoading, refreshData, getActiveSignals } = useSimulation();
-  const activeSignals = getActiveSignals();
-  const [filter, setFilter] = useState<Signal['type'] | 'all'>('all');
+  const { houses, games, signals, isLoading, refreshData } = useSimulation();
+  const [filter, setFilter] = useState<string>('all');
+  const { profile } = useAuth();
 
-  const filteredSignals = filter === 'all' 
-    ? activeSignals 
-    : activeSignals.filter(signal => signal.type === filter);
+  // Filtra sinais conforme plano do usuário
+  let filteredSignals = signals;
+  if (profile?.plan === 'premium') {
+    // premium users see non-VIP signals (we consider VIP = prob >= 85)
+    filteredSignals = signals.filter(signal => signal.probability < 85);
+  } else if (profile?.plan === 'vip') {
+    filteredSignals = signals;
+  } else {
+    filteredSignals = [];
+  }
 
   const filterOptions = [
     { value: 'all', label: 'Todos', icon: '🔄' },
     { value: 'golden_moment', label: 'Momento Ouro', icon: '⭐' },
     { value: 'bonus_sequence', label: 'Sequência Bônus', icon: '🎁' },
     { value: 'victory_pattern', label: 'Padrão Vitória', icon: '🏆' },
-  ] as const;
+  ];
+  if (filter !== 'all') {
+    filteredSignals = filteredSignals.filter(signal => signal.type === filter);
+  }
 
   return (
     <div className="min-h-screen bg-background pb-24">
@@ -34,7 +44,7 @@ export const Signals = () => {
           <Button
             variant="secondary"
             size="sm"
-            onClick={refreshData}
+            onClick={() => refreshData()}
             disabled={isLoading}
             className="bg-white/20 text-white border-none hover:bg-white/30"
           >
@@ -45,7 +55,7 @@ export const Signals = () => {
         {/* Stats */}
         <div className="grid grid-cols-3 gap-4">
           <div className="bg-white/10 rounded-lg p-3 backdrop-blur-sm text-center">
-            <div className="text-lg font-bold text-white">{activeSignals.length}</div>
+            <div className="text-lg font-bold text-white">{filteredSignals.length}</div>
             <div className="text-white/80 text-xs">Ativos</div>
           </div>
           
@@ -55,11 +65,7 @@ export const Signals = () => {
           </div>
           
           <div className="bg-white/10 rounded-lg p-3 backdrop-blur-sm text-center">
-            <div className="text-lg font-bold text-white">
-              {activeSignals.length > 0 
-                ? Math.round(activeSignals.reduce((acc, s) => acc + s.probability, 0) / activeSignals.length)
-                : 0}%
-            </div>
+            <div className="text-lg font-bold text-white">0%</div>
             <div className="text-white/80 text-xs">Média</div>
           </div>
         </div>
@@ -116,85 +122,27 @@ export const Signals = () => {
         ) : filteredSignals.length > 0 ? (
           <div className="space-y-4">
             {filteredSignals.map((signal) => {
-              const game = games.find(g => g.id === signal.gameId);
-              const house = houses.find(h => h.id === signal.houseId);
-              
-              if (!game || !house) return null;
-              
+              const game = (signal.gameId && signal.gameId !== undefined) ? (/**/ null) : null; // placeholder to keep TS happy
+              // find matching game and house from the signals data structures
+              const g = (signal.gameId ? undefined : undefined) as any; // noop for types
+              // actual lookup using arrays available in this component
+              // (we rely on the `games` and `houses` arrays from the simulation hook)
+              const gameMatch = games.find((g) => g.id === signal.gameId);
+              const houseMatch = houses.find((h) => h.id === signal.houseId);
+              if (!gameMatch || !houseMatch) return null;
               return (
                 <SignalCard
                   key={signal.id}
                   signal={signal}
-                  game={game}
-                  house={house}
+                  game={gameMatch}
+                  house={houseMatch}
                 />
               );
             })}
           </div>
         ) : (
-          <div className="text-center py-12">
-            <div className="text-6xl mb-4">📡</div>
-            <h3 className="text-xl font-semibold text-foreground mb-2">
-              {filter === 'all' ? 'Nenhum sinal ativo' : 'Nenhum sinal encontrado'}
-            </h3>
-            <p className="text-muted-foreground mb-6">
-              {filter === 'all' 
-                ? 'Aguarde, novos sinais serão gerados automaticamente'
-                : 'Tente outro filtro ou aguarde novos sinais'
-              }
-            </p>
-            <div className="space-y-3">
-              <Button 
-                variant="outline" 
-                onClick={refreshData} 
-                disabled={isLoading}
-              >
-                <RefreshCw className={cn("w-4 h-4 mr-2", isLoading && "animate-spin")} />
-                Verificar Novos Sinais
-              </Button>
-              
-              {filter !== 'all' && (
-                <div>
-                  <Button 
-                    variant="ghost" 
-                    onClick={() => setFilter('all')}
-                    className="text-sm"
-                  >
-                    Ver todos os sinais
-                  </Button>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Signal Types Legend */}
-        {activeSignals.length > 0 && (
-          <div className="mt-8 p-4 bg-card rounded-lg border border-border">
-            <h3 className="font-semibold text-card-foreground mb-3 flex items-center gap-2">
-              <TrendingUp className="w-4 h-4" />
-              Tipos de Sinais
-            </h3>
-            <div className="space-y-2 text-sm">
-              <div className="flex items-center gap-3">
-                <span className="text-warning">⭐</span>
-                <span className="text-muted-foreground">
-                  <strong className="text-warning">Momento Ouro:</strong> Alta probabilidade de ganho imediato
-                </span>
-              </div>
-              <div className="flex items-center gap-3">
-                <span className="text-success">🎁</span>
-                <span className="text-muted-foreground">
-                  <strong className="text-success">Sequência Bônus:</strong> Múltiplas rodadas favoráveis
-                </span>
-              </div>
-              <div className="flex items-center gap-3">
-                <span className="text-hot">🏆</span>
-                <span className="text-muted-foreground">
-                  <strong className="text-hot">Padrão Vitória:</strong> Sequência de resultados positivos
-                </span>
-              </div>
-            </div>
+          <div className="text-center text-muted-foreground py-12">
+            Nenhum sinal encontrado.
           </div>
         )}
       </div>

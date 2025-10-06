@@ -1,97 +1,37 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { Check, Crown, Zap, Star, ArrowLeft } from "lucide-react";
 import { Link } from "react-router-dom";
+import { getPlans } from "@/lib/localDbApi";
 
 interface Plan {
-  id: string;
+  id: number;
   name: string;
   description: string;
   price: number;
-  originalPrice?: number;
-  duration: string;
-  popular?: boolean;
-  premium?: boolean;
-  features: string[];
-  color: string;
-  icon: React.ReactNode;
 }
-
-const plans: Plan[] = [
-  {
-    id: "basico",
-    name: "Básico",
-    description: "Ideal para iniciantes",
-    price: 9.99,
-    duration: "30 dias",
-    features: [
-      "Acesso aos jogos",
-      "Análise de 3 casas de apostas",
-      "Suporte via WhatsApp",
-      "Alertas em tempo real"
-    ],
-    color: "from-secondary to-secondary/80",
-    icon: <Zap className="w-6 h-6" />
-  },
-  {
-    id: "premium",
-    name: "Premium",
-    description: "Mais sinais e recursos",
-    price: 19.99,
-    duration: "30 dias",
-    popular: true,
-    features: [
-      "Acesso aos jogos",
-      "Sinais premium exclusivos",
-      "Análise de todas as casas",
-      "Suporte prioritário 24/7",
-      "Alertas personalizados",
-      "Histórico de performance"
-    ],
-    color: "from-primary to-secondary",
-    icon: <Star className="w-6 h-6" />
-  },
-  {
-    id: "vip",
-    name: "VIP Diamond",
-    description: "Para profissionais",
-    price: 49.99,
-    duration: "30 dias",
-    premium: true,
-    features: [
-      "Todos os recursos Premium",
-      "Sinais VIP exclusivos (85%+)",
-      "Acesso total à plataforma",
-      "Análise técnica avançada",
-      "Calls ao vivo diárias",
-      "Suporte 1 a 1",
-      "Garantia de resultado"
-    ],
-    color: "from-warning to-warning/80",
-    icon: <Crown className="w-6 h-6" />
-  }
-];
 
 export const Plans = () => {
   const [selectedPlan, setSelectedPlan] = useState<string>("");
   const [isLoading, setIsLoading] = useState(false);
+  const [plans, setPlans] = useState<Plan[]>([]);
   const { toast } = useToast();
+
+  useEffect(() => {
+    getPlans().then((data) => setPlans(data));
+  }, []);
 
   const handleSelectPlan = async (planId: string) => {
     setSelectedPlan(planId);
     setIsLoading(true);
-
     try {
-      // TODO: Implementar integração com Mercado Pago
       toast({
         title: "Redirecionando para pagamento...",
         description: "Você será redirecionado para finalizar a compra.",
       });
-      
-      // Simular redirecionamento
       setTimeout(() => {
         window.location.href = `/checkout/${planId}`;
       }, 2000);
@@ -151,84 +91,27 @@ export const Plans = () => {
         {/* Plans Grid */}
         <div className="grid md:grid-cols-3 gap-6 max-w-6xl mx-auto">
           {plans.map((plan) => (
-            <Card 
-              key={plan.id} 
-              className={`relative border-border shadow-elevated transition-all duration-300 hover:scale-105 ${
-                plan.popular ? 'ring-2 ring-primary shadow-2xl' : ''
-              } ${plan.premium ? 'ring-2 ring-warning shadow-2xl' : ''}`}
-            >
-              {/* Badge */}
-              {plan.popular && (
-                <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                  <Badge className="bg-primary text-primary-foreground px-4 py-1">
-                    Mais Popular
-                  </Badge>
-                </div>
-              )}
-              {plan.premium && (
-                <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                  <Badge className="bg-warning text-warning-foreground px-4 py-1">
-                    💎 VIP Diamond
-                  </Badge>
-                </div>
-              )}
-
+            <Card key={plan.id} className="relative border-border shadow-elevated transition-all duration-300 hover:scale-105">
               <CardHeader className="text-center space-y-4">
-                <div className={`w-16 h-16 bg-gradient-to-r ${plan.color} rounded-2xl flex items-center justify-center mx-auto text-white`}>
-                  {plan.icon}
+                <div className={`w-16 h-16 bg-gradient-to-r from-primary to-secondary rounded-2xl flex items-center justify-center mx-auto text-white`}>
+                  <Star className="w-6 h-6" />
                 </div>
-                
                 <div>
                   <CardTitle className="text-2xl text-foreground">{plan.name}</CardTitle>
-                  <CardDescription className="text-muted-foreground mt-2">
-                    {plan.description}
-                  </CardDescription>
+                  <CardDescription className="text-muted-foreground mt-2">{plan.description}</CardDescription>
                 </div>
-
                 <div className="space-y-2">
-                  <div className="flex items-center justify-center space-x-2">
-                    {plan.originalPrice && (
-                      <span className="text-lg text-muted-foreground line-through">
-                        R$ {plan.originalPrice.toFixed(2)}
-                      </span>
-                    )}
-                    <span className="text-4xl font-bold text-foreground">
-                      R$ {plan.price.toFixed(2)}
-                    </span>
-                  </div>
-                  <p className="text-sm text-muted-foreground">
-                    por {plan.duration}
-                  </p>
-                  {plan.originalPrice && (
-                    <Badge variant="secondary" className="bg-success/20 text-success">
-                      Economize R$ {(plan.originalPrice - plan.price).toFixed(2)}
-                    </Badge>
-                  )}
+                  <span className="text-4xl font-bold text-foreground">R$ {plan.price.toFixed(2)}</span>
+                  <p className="text-sm text-muted-foreground">por 30 dias</p>
                 </div>
               </CardHeader>
-
               <CardContent className="space-y-6">
-                <ul className="space-y-3">
-                  {plan.features.map((feature, index) => (
-                    <li key={index} className="flex items-start space-x-3">
-                      <div className="w-5 h-5 bg-success/20 rounded-full flex items-center justify-center mt-0.5">
-                        <Check className="w-3 h-3 text-success" />
-                      </div>
-                      <span className="text-sm text-muted-foreground">{feature}</span>
-                    </li>
-                  ))}
-                </ul>
-
                 <Button 
-                  onClick={() => handleSelectPlan(plan.id)}
-                  disabled={isLoading && selectedPlan === plan.id}
-                  className={`w-full font-semibold ${
-                    plan.popular || plan.premium 
-                      ? 'bg-gradient-primary hover:opacity-90 text-primary-foreground' 
-                      : 'bg-secondary hover:bg-secondary/80 text-secondary-foreground'
-                  }`}
+                  onClick={() => handleSelectPlan(plan.id.toString())}
+                  disabled={isLoading && selectedPlan === plan.id.toString()}
+                  className="w-full font-semibold bg-gradient-primary hover:opacity-90 text-primary-foreground"
                 >
-                  {isLoading && selectedPlan === plan.id 
+                  {isLoading && selectedPlan === plan.id.toString() 
                     ? "Processando..." 
                     : "Escolher Plano"
                   }
@@ -236,58 +119,6 @@ export const Plans = () => {
               </CardContent>
             </Card>
           ))}
-        </div>
-
-        {/* FAQ Section */}
-        <div className="mt-16 text-center space-y-6">
-          <h3 className="text-2xl font-bold text-foreground">
-            Perguntas Frequentes
-          </h3>
-          <div className="grid md:grid-cols-2 gap-6 max-w-4xl mx-auto text-left">
-            <Card className="border-border bg-card/50">
-              <CardContent className="p-6">
-                <h4 className="font-semibold text-foreground mb-2">
-                  Como funciona a garantia?
-                </h4>
-                <p className="text-sm text-muted-foreground">
-                  Oferecemos 7 dias de garantia. Se não ficar satisfeito, devolvemos 100% do valor.
-                </p>
-              </CardContent>
-            </Card>
-            
-            <Card className="border-border bg-card/50">
-              <CardContent className="p-6">
-                <h4 className="font-semibold text-foreground mb-2">
-                  Posso cancelar a qualquer momento?
-                </h4>
-                <p className="text-sm text-muted-foreground">
-                  Sim, você pode cancelar sua assinatura a qualquer momento pelo WhatsApp.
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card className="border-border bg-card/50">
-              <CardContent className="p-6">
-                <h4 className="font-semibent text-foreground mb-2">
-                  Como recebo os sinais?
-                </h4>
-                <p className="text-sm text-muted-foreground">
-                  Os sinais são enviados em tempo real via app, WhatsApp e Telegram.
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card className="border-border bg-card/50">
-              <CardContent className="p-6">
-                <h4 className="font-semibold text-foreground mb-2">
-                  Qual forma de pagamento aceita?
-                </h4>
-                <p className="text-sm text-muted-foreground">
-                  Aceitamos PIX, cartão de crédito e débito via Mercado Pago.
-                </p>
-              </CardContent>
-            </Card>
-          </div>
         </div>
       </div>
     </div>

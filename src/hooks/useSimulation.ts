@@ -97,12 +97,55 @@ export const useSimulation = (): SimulationState & {
         signals.push(generateSignal(randomGame.id, randomHouse.id));
       }
 
-      setState(prev => ({
-        ...prev,
-        houses,
-        signals,
-        isLoading: false,
-      }));
+      // Try to fetch signals from local DB and map them to the UI Signal shape
+      (async () => {
+        try {
+          const API_BASE = (import.meta as any).env.VITE_API_URL || '';
+          const res = await fetch(`${API_BASE}/api/signals`);
+          if (res.ok) {
+            const dbSignals: any[] = await res.json();
+            // Map DB signals (which may have title/description/created_at/vip_only)
+            const mapped = dbSignals.map(s => {
+              // choose random game/house for DB signals so 'Apostar' button has a target
+              const randomGame = GAMES[Math.floor(Math.random() * GAMES.length)];
+              const randomHouse = houses[Math.floor(Math.random() * houses.length)];
+              const probability = s.vip_only ? (Math.random() * 10 + 88) : (Math.random() * 15 + 70);
+              return {
+                id: `db-${s.id}`,
+                gameId: randomGame.id,
+                houseId: randomHouse.id,
+                message: s.title || s.description || s.message || 'Sinal',
+                probability,
+                timestamp: s.created_at ? new Date(s.created_at) : new Date(),
+                status: 'active',
+                type: 'bonus_sequence' as const,
+              } as Signal;
+            });
+
+            // merge DB signals with simulated ones (DB signals first)
+            const merged = [...mapped, ...signals];
+
+            setState(prev => ({
+              ...prev,
+              houses,
+              signals: merged,
+              isLoading: false,
+            }));
+            return;
+          }
+        } catch (e) {
+          // ignore fetch errors and fall back to generated signals
+          console.log('Could not fetch DB signals:', e);
+        }
+
+        // fallback if DB fetch failed
+        setState(prev => ({
+          ...prev,
+          houses,
+          signals,
+          isLoading: false,
+        }));
+      })();
     }, 1000);
   }, []);
 

@@ -9,7 +9,7 @@ interface ProtectedRouteProps {
 }
 
 export const ProtectedRoute = ({ children, feature }: ProtectedRouteProps) => {
-  const { user, profile, loading, hasAccess } = useAuth();
+  const { user, profile, loading, hasAccess, isMaster } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -32,8 +32,20 @@ export const ProtectedRoute = ({ children, feature }: ProtectedRouteProps) => {
     );
   }
 
-  if (!user) {
+  // Também verifica localStorage para o caso do auth ainda estar sendo restaurado
+  let localIsMaster = false;
+  try {
+    const flag = localStorage.getItem('isMaster');
+    if (flag === '1') localIsMaster = true;
+  } catch (e) {}
+
+  if (!user && !localIsMaster) {
     return <Navigate to="/login" replace />;
+  }
+
+  // Usuário master tem acesso irrestrito
+  if (isMaster || localIsMaster) {
+    return <>{children}</>;
   }
 
   if (feature && profile && !hasAccess(feature)) {

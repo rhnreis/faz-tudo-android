@@ -29,51 +29,43 @@ const plans: { [key: string]: Plan } = {
   basic: {
     id: "basic",
     name: "Plano Básico",
-    price: 29.90,
+    price: 29.9,
     duration: "7 dias",
     features: ["Sinais básicos diários", "3 casas de apostas", "Suporte WhatsApp"]
   },
   premium: {
-    id: "premium", 
+    id: "premium",
     name: "Plano Premium",
-    price: 79.90,
+    price: 79.9,
     duration: "30 dias",
     features: ["Sinais premium", "Todas as casas", "Suporte 24/7", "Grupo VIP"]
   },
   vip: {
     id: "vip",
-    name: "VIP Diamond",
-    price: 149.90,
-    duration: "30 dias", 
-    features: ["Todos recursos Premium", "Calls ao vivo", "Suporte 1:1", "E-book grátis"]
+    name: "Plano VIP",
+    price: 149.9,
+    duration: "90 dias",
+    features: ["Sinais VIP", "Acesso total", "Consultoria via WhatsApp"]
   }
-};
+}
 
-export const Checkout = () => {
-  const { planId } = useParams<{ planId: string }>();
+export default function Checkout() {
+  const { planId } = useParams<{ planId?: string }>();
   const [paymentMethod, setPaymentMethod] = useState<"pix" | "card">("pix");
   const [isProcessing, setIsProcessing] = useState(false);
   const [pixCode, setPixCode] = useState("");
   const [showPixCode, setShowPixCode] = useState(false);
-  const [customerData, setCustomerData] = useState({
-    name: "",
-    email: "",
-    phone: "",
-    cpf: ""
-  });
+  const [customerData, setCustomerData] = useState({ name: "", email: "", phone: "", cpf: "" });
   const { toast } = useToast();
 
-  const plan = planId ? plans[planId] : null;
+  const plan = planId ? plans[planId] || plans['basic'] : plans['basic'];
 
   useEffect(() => {
     if (!plan) {
-      toast({
-        title: "Plano não encontrado",
-        description: "Redirecionando para seleção de planos...",
-        variant: "destructive",
-      });
+      toast({ title: "Plano não encontrado", description: "Redirecionando para seleção de planos...", variant: "destructive" });
     }
-  }, [plan, toast]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleInputChange = (field: string, value: string) => {
     setCustomerData(prev => ({ ...prev, [field]: value }));
@@ -81,52 +73,38 @@ export const Checkout = () => {
 
   const generatePixPayment = async () => {
     setIsProcessing(true);
-
     try {
-      // TODO: Integrar com API do Mercado Pago
-      // Simular geração do código PIX
-      const mockPixCode = "00020101021126580014br.gov.bcb.pix0136123e4567-e12b-12d1-a456-426614174000520400005303986540" + plan?.price.toFixed(2) + "5802BR5925SinaisVIP6009SAO PAULO62070503***6304";
-      
-      setTimeout(() => {
-        setPixCode(mockPixCode);
-        setShowPixCode(true);
-        setIsProcessing(false);
-        
-        toast({
-          title: "PIX gerado com sucesso!",
-          description: "Copie o código ou escaneie o QR Code para pagar.",
-        });
-      }, 2000);
-    } catch (error) {
-      toast({
-        title: "Erro ao gerar PIX",
-        description: "Tente novamente em alguns instantes.",
-        variant: "destructive",
+      const API_BASE = (import.meta as any).env.VITE_API_URL || '';
+      const resp = await fetch(`${API_BASE}/api/create-payment`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ planId: plan.id, customer: customerData, method: 'pix' })
       });
+      if (!resp.ok) throw new Error('failed');
+      const data = await resp.json();
+      setPixCode(data.pix_code || '');
+      setShowPixCode(true);
+      toast({ title: 'PIX gerado com sucesso!', description: 'Copie o código ou escaneie o QR Code para pagar.' });
+    } catch (error) {
+      console.error(error);
+      toast({ title: 'Erro ao gerar PIX', description: 'Tente novamente em alguns instantes.', variant: 'destructive' });
+    } finally {
       setIsProcessing(false);
     }
   };
 
   const copyPixCode = () => {
-    navigator.clipboard.writeText(pixCode);
-    toast({
-      title: "Código copiado!",
-      description: "Cole no seu banco para efetuar o pagamento.",
-    });
+    try { navigator.clipboard.writeText(pixCode); }
+    catch (e) { /* ignore */ }
+    toast({ title: 'Código copiado!', description: 'Cole no seu banco para efetuar o pagamento.' });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (paymentMethod === "pix") {
+    if (paymentMethod === 'pix') {
       await generatePixPayment();
     } else {
-      // TODO: Implementar pagamento com cartão
-      toast({
-        title: "Pagamento com cartão",
-        description: "Funcionalidade em desenvolvimento.",
-        variant: "destructive",
-      });
+      toast({ title: 'Pagamento com cartão', description: 'Funcionalidade em desenvolvimento.', variant: 'destructive' });
     }
   };
 

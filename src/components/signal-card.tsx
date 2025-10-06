@@ -129,3 +129,19 @@ export const SignalCard = ({ signal, game, house, onClick, className }: SignalCa
     </Card>
   );
 };
+
+// Adaptação para uso simples: se não houver game/house, renderiza apenas dados do signal
+export const SimpleSignalCard = ({ signal }: { signal: any }) => (
+  <Card className="p-4 mb-2">
+    <div className="flex items-center justify-between mb-2">
+      <span className="font-bold">{signal.title || signal.message}</span>
+      <span className="text-xs text-muted-foreground">{signal.created_at || signal.timestamp}</span>
+    </div>
+    <div className="text-sm text-muted-foreground mb-2">{signal.description || signal.message}</div>
+    <div className="flex gap-2">
+      <Button size="sm" variant="outline" disabled>
+        {signal.vip_only ? 'VIP' : 'Normal'}
+      </Button>
+    </div>
+  </Card>
+);
