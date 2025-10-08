@@ -1,5 +1,5 @@
 // API para admin: usuários, planos, Mercado Pago
-const API_BASE = (import.meta as any).env.VITE_API_URL || '';
+const API_BASE = (import.meta.env.VITE_API_URL ?? "").trim();
 
 export async function getUsers() {
   const res = await fetch(`${API_BASE}/api/admin/users`);

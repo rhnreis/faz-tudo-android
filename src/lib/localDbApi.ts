@@ -1,4 +1,11 @@
-const API_BASE = (import.meta as any).env.VITE_API_URL || '';
+interface ApiPlan {
+  id: number;
+  name: string;
+  description?: string | null;
+  price: number;
+}
+
+const API_BASE = (import.meta.env.VITE_API_URL ?? "").trim();
 
 export async function getProfile(email: string) {
   const res = await fetch(`${API_BASE}/api/profile/${email}`);
@@ -14,7 +21,7 @@ export async function createProfile(email: string, full_name: string, phone: str
   return res.json();
 }
 
-export async function getPlans() {
+export async function getPlans(): Promise<ApiPlan[]> {
   const res = await fetch(`${API_BASE}/api/plans`);
   return res.json();
 }

@@ -24,6 +24,9 @@ export interface Signal {
   houseId: string;
   message: string;
   probability: number;
+  durationSeconds: number;
+  expiresAt: Date;
+  vipOnly: boolean;
   timestamp: Date;
   status: 'active' | 'expired' | 'upcoming';
   type: 'golden_moment' | 'bonus_sequence' | 'victory_pattern';

@@ -14,7 +14,7 @@ import { Settings } from "./pages/Settings";
 import { Login } from "./pages/Login";
 import { Register } from "./pages/Register";
 import { Plans } from "./pages/Plans";
-import { Checkout } from "./pages/Checkout";
+import Checkout from "./pages/Checkout";
 import { Landing } from "./pages/Landing";
 import { BottomNavigation } from "./components/bottom-navigation";
 import NotFound from "./pages/NotFound";

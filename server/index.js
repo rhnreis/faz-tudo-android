@@ -323,18 +323,53 @@ app.listen(PORT, () => {
   console.log(`API rodando em http://localhost:${PORT}`);
   // listar rotas registradas (debug)
   try {
-    const routes = [];
-    const routerStack = (app._router && app._router.stack) ? app._router.stack : [];
-    routerStack.forEach(mw => {
-      if (mw && mw.route && mw.route.path) {
-        const methods = Object.keys(mw.route.methods).join(',').toUpperCase();
-        routes.push(`${methods} ${mw.route.path}`);
-      }
-    });
+    // Safer route listing that checks for direct routes and nested routers
+    const listRoutes = () => {
+      const found = [];
+      const stack = (app._router && app._router.stack) ? app._router.stack : [];
+      stack.forEach(layer => {
+        // direct route
+        if (layer && layer.route) {
+          const methods = Object.keys(layer.route.methods || {}).map(m => m.toUpperCase()).join(',');
+          found.push(`${methods} ${layer.route.path}`);
+        }
+        // nested router (express.Router())
+        else if (layer && layer.name === 'router' && layer.handle && layer.handle.stack) {
+          layer.handle.stack.forEach(l => {
+            if (l && l.route) {
+              const methods = Object.keys(l.route.methods || {}).map(m => m.toUpperCase()).join(',');
+              found.push(`${methods} ${l.route.path}`);
+            }
+          });
+        }
+      });
+      return found;
+    };
+
+    const routes = listRoutes();
     if (routes.length) {
       console.log('Rotas registradas:\n', routes.join('\n'));
     } else {
-      console.log('Nenhuma rota registrada (app._router.stack vazia).');
+      console.log('Nenhuma rota registrada (não foram detectadas entradas no router).');
+      try {
+        const stack = (app._router && app._router.stack) ? app._router.stack : [];
+        console.log('\n*** DEBUG: app._router.stack diagnóstico (itens):');
+        console.log('stack.length =', stack.length);
+        stack.forEach((layer, idx) => {
+          try {
+            const keys = Object.keys(layer || {}).join(',');
+            const name = layer && layer.name ? layer.name : '<no-name>';
+            const routePath = layer && layer.route && layer.route.path ? layer.route.path : null;
+            const regexp = layer && layer.regexp ? String(layer.regexp).slice(0,120) : null;
+            const nested = layer && layer.handle && layer.handle.stack ? layer.handle.stack.length : 0;
+            console.log(`#${idx}: name=${name} keys=[${keys}] routePath=${routePath} regexp=${regexp} nestedStackLen=${nested}`);
+          } catch (e2) {
+            console.log(`#${idx}: error while inspecting layer:`, String(e2));
+          }
+        });
+      } catch (e3) {
+        console.log('Erro ao debugar router stack:', e3);
+      }
     }
   } catch (e) {
     console.log('Não foi possível listar rotas:', e);

@@ -1,4 +1,4 @@
-const API_BASE = (import.meta as any).env.VITE_API_URL || '';
+const API_BASE = (import.meta.env.VITE_API_URL ?? "").trim();
 
 export async function localRegister(email: string, password: string) {
   const res = await fetch(`${API_BASE}/api/register`, {
