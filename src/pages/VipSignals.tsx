@@ -1,236 +1,227 @@
+import { useEffect, useMemo, useState } from "react";
 import { useSimulation } from "@/hooks/useSimulation";
 import { SignalCard } from "@/components/signal-card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
-import { RefreshCw, Crown, Star, Zap, TrendingUp, Lock } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useState } from "react";
-import { Signal } from "@/types";
+import type { Signal } from "@/types";
+import {
+  RefreshCw,
+  Crown,
+  Star,
+  Zap,
+  TrendingUp,
+  Lock,
+  Sparkles,
+  Sun,
+  Repeat,
+  Target,
+} from "lucide-react";
+
+type FilterValue = "all" | Signal["type"];
 
 export const VipSignals = () => {
-  const { houses, games, signals, isLoading, refreshData, getActiveSignals } = useSimulation();
-  const activeSignals = getActiveSignals();
-  const [filter, setFilter] = useState<Signal['type'] | 'all'>('all');
+  const { houses, games, isLoading, refreshData, getActiveSignals } = useSimulation();
+  const [filter, setFilter] = useState<FilterValue>("all");
+  const [now, setNow] = useState(() => Date.now());
 
-  // Filter only high probability signals for VIP
-  const vipSignals = activeSignals.filter(signal => signal.probability >= 85);
-  
-  const filteredSignals = filter === 'all' 
-    ? vipSignals 
-    : vipSignals.filter(signal => signal.type === filter);
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
 
-  const filterOptions = [
-    { value: 'all', label: 'Todos VIP', icon: '👑' },
-    { value: 'golden_moment', label: 'Golden', icon: '⭐' },
-    { value: 'bonus_sequence', label: 'Bônus VIP', icon: '🎁' },
-    { value: 'victory_pattern', label: 'Padrão Elite', icon: '🏆' },
-  ] as const;
+  const activeSignals = useMemo(() => getActiveSignals(), [getActiveSignals]);
+  const vipSignals = useMemo(
+    () => activeSignals.filter(signal => signal.probability >= 85),
+    [activeSignals]
+  );
+
+  const filteredSignals = useMemo(() => {
+    if (filter === "all") return vipSignals;
+    return vipSignals.filter(signal => signal.type === filter);
+  }, [filter, vipSignals]);
+
+  const averageConfidence = vipSignals.length
+    ? Math.round(vipSignals.reduce((acc, signal) => acc + signal.probability, 0) / vipSignals.length)
+    : 0;
+  const eliteCount = vipSignals.filter(signal => signal.probability >= 90).length;
+
+  const filterOptions: { value: FilterValue; label: string; icon: JSX.Element }[] = [
+    { value: "all", label: "Todos", icon: <Sparkles className="w-4 h-4" /> },
+    { value: "golden_moment", label: "Momento Ouro", icon: <Sun className="w-4 h-4" /> },
+    { value: "bonus_sequence", label: "Sequência VIP", icon: <Repeat className="w-4 h-4" /> },
+    { value: "victory_pattern", label: "Padrão Elite", icon: <Target className="w-4 h-4" /> },
+  ];
+
+  const renderCard = (signal: Signal) => {
+    const game = games.find(g => g.id === signal.gameId);
+    const house = houses.find(h => h.id === signal.houseId);
+    if (!game || !house) return null;
+    return (
+      <div key={signal.id} className="relative">
+        <div className="absolute -top-2 -right-2 z-10">
+          <Badge className="bg-rose-500 text-white border-none shadow-sm">
+            <Crown className="w-3 h-3 mr-1" />
+            VIP
+          </Badge>
+        </div>
+        <SignalCard signal={signal} game={game} house={house} currentTime={now} />
+      </div>
+    );
+  };
 
   return (
     <div className="min-h-screen bg-background pb-24">
-      {/* VIP Header */}
-      <div className="bg-gradient-to-br from-yellow-400 via-yellow-500 to-yellow-600 p-6 pb-8">
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm">
-              <Crown className="w-6 h-6 text-white" />
+      <div className="bg-gradient-to-br from-amber-300 via-amber-400 to-rose-400 p-6 pb-10 text-slate-900">
+        <div className="flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
+          <div className="flex items-start gap-3">
+            <div className="w-12 h-12 rounded-2xl bg-white/40 backdrop-blur flex items-center justify-center shadow">
+              <Crown className="w-7 h-7 text-amber-700" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-white flex items-center gap-2">
-                Sinais VIP
-                <Badge className="bg-white/20 text-white border-none">
-                  PREMIUM
-                </Badge>
-              </h1>
-              <p className="text-white/90 text-sm">Sinais exclusivos de alta precisão</p>
+              <Badge variant="outline" className="border-amber-200 text-amber-800 bg-white/40 mb-2">
+                Atualizado {new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit" }).format(now)}
+              </Badge>
+              <h1 className="text-3xl font-bold">Sala VIP</h1>
+              <p className="text-sm text-slate-800/80 max-w-xl">
+                Sinais exclusivos com monitoramento avançado, pensados para quem busca precisão de elite.
+              </p>
             </div>
           </div>
+
           <Button
             variant="secondary"
             size="sm"
             onClick={refreshData}
             disabled={isLoading}
-            className="bg-white/20 text-white border-none hover:bg-white/30"
+            className="self-end md:self-auto bg-white/50 text-amber-800 border-transparent hover:bg-white/70"
           >
-            <RefreshCw className={cn("w-4 h-4", isLoading && "animate-spin")} />
+            <RefreshCw className={cn("w-4 h-4 mr-2", isLoading && "animate-spin")} />
+            Atualizar
           </Button>
         </div>
 
-        {/* VIP Stats */}
-        <div className="grid grid-cols-3 gap-4">
-          <div className="bg-white/15 rounded-lg p-3 backdrop-blur-sm text-center border border-white/20">
-            <div className="text-lg font-bold text-white">{vipSignals.length}</div>
-            <div className="text-white/90 text-xs">VIP Ativos</div>
-          </div>
-          
-          <div className="bg-white/15 rounded-lg p-3 backdrop-blur-sm text-center border border-white/20">
-            <div className="text-lg font-bold text-white">
-              {vipSignals.length > 0 
-                ? Math.round(vipSignals.reduce((acc, s) => acc + s.probability, 0) / vipSignals.length)
-                : 0}%
+        <div className="mt-6 grid gap-4 sm:grid-cols-3">
+          <div className="rounded-xl bg-white/45 p-4 shadow-sm">
+            <div className="text-sm text-amber-800/80 flex items-center gap-2">
+              <Sparkles className="w-4 h-4" />
+              VIP ativos
             </div>
-            <div className="text-white/90 text-xs">Precisão</div>
+            <div className="text-3xl font-semibold text-amber-900">{vipSignals.length}</div>
           </div>
-          
-          <div className="bg-white/15 rounded-lg p-3 backdrop-blur-sm text-center border border-white/20">
-            <div className="text-lg font-bold text-white">
-              {vipSignals.filter(s => s.probability >= 90).length}
+          <div className="rounded-xl bg-white/45 p-4 shadow-sm">
+            <div className="text-sm text-amber-800/80 flex items-center gap-2">
+              <TrendingUp className="w-4 h-4" />
+              Confiança média
             </div>
-            <div className="text-white/90 text-xs">Elite (90%+)</div>
+            <div className="text-3xl font-semibold text-amber-900">{averageConfidence}%</div>
+          </div>
+          <div className="rounded-xl bg-white/45 p-4 shadow-sm">
+            <div className="text-sm text-amber-800/80 flex items-center gap-2">
+              <Crown className="w-4 h-4" />
+              Elite (90%+)
+            </div>
+            <div className="text-3xl font-semibold text-amber-900">{eliteCount}</div>
           </div>
         </div>
       </div>
 
-      {/* Content */}
-      <div className="p-4">
-        {/* VIP Benefits */}
-        <Card className="mb-6 p-4 bg-gradient-to-r from-yellow-50 to-amber-50 border-yellow-200">
+      <div className="p-4 space-y-6">
+        <Card className="p-4 border-amber-100 bg-amber-50/60">
           <div className="flex items-center gap-3 mb-3">
-            <Star className="w-5 h-5 text-yellow-600" />
-            <h3 className="font-semibold text-yellow-800">Benefícios VIP</h3>
+            <Star className="w-5 h-5 text-amber-600" />
+            <h3 className="font-semibold text-amber-800">Benefícios exclusivos</h3>
           </div>
-          <div className="grid grid-cols-2 gap-3 text-sm">
-            <div className="flex items-center gap-2 text-yellow-700">
+          <div className="grid gap-3 text-sm md:grid-cols-2">
+            <div className="flex items-center gap-2 text-amber-700">
               <Zap className="w-4 h-4" />
-              <span>Sinais em tempo real</span>
+              Entrada antecipada em sinais quentes
             </div>
-            <div className="flex items-center gap-2 text-yellow-700">
+            <div className="flex items-center gap-2 text-amber-700">
               <TrendingUp className="w-4 h-4" />
-              <span>Precisão +85%</span>
+              Precisão mínima de 85% garantida pelo algoritmo
             </div>
-            <div className="flex items-center gap-2 text-yellow-700">
+            <div className="flex items-center gap-2 text-amber-700">
               <Crown className="w-4 h-4" />
-              <span>Análise avançada</span>
+              Monitoramento dedicado das melhores casas
             </div>
-            <div className="flex items-center gap-2 text-yellow-700">
+            <div className="flex items-center gap-2 text-amber-700">
               <Star className="w-4 h-4" />
-              <span>Suporte prioritário</span>
+              Suporte prioritário com especialistas
             </div>
           </div>
         </Card>
 
-        {/* Filters */}
-        <div className="mb-6">
-          <div className="flex gap-2 overflow-x-auto pb-2">
-            {filterOptions.map((option) => (
-              <Button
-                key={option.value}
-                variant={filter === option.value ? "default" : "outline"}
-                size="sm"
-                onClick={() => setFilter(option.value)}
-                className={cn(
-                  "flex items-center gap-2 whitespace-nowrap",
-                  filter === option.value && "bg-yellow-500 text-white hover:bg-yellow-600"
-                )}
-              >
-                <span>{option.icon}</span>
-                <span>{option.label}</span>
-              </Button>
-            ))}
-          </div>
+        <div className="flex gap-2 overflow-x-auto pb-2">
+          {filterOptions.map(option => (
+            <Button
+              key={option.value}
+              variant={filter === option.value ? "default" : "outline"}
+              size="sm"
+              onClick={() => setFilter(option.value)}
+              className={cn(
+                "flex items-center gap-2 whitespace-nowrap border-amber-200 text-amber-700",
+                filter === option.value
+                  ? "bg-gradient-to-r from-amber-400 to-rose-400 text-white border-transparent"
+                  : "hover:bg-amber-100/80"
+              )}
+            >
+              {option.icon}
+              <span>{option.label}</span>
+            </Button>
+          ))}
         </div>
 
-        {/* VIP Signals List */}
         {isLoading ? (
           <div className="space-y-4">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="bg-card rounded-lg p-4 animate-pulse border border-yellow-200">
+            {[1, 2, 3].map(item => (
+              <div
+                key={item}
+                className="rounded-lg border border-amber-100 bg-card/70 p-4 animate-pulse"
+              >
                 <div className="flex items-center gap-3 mb-3">
-                  <div className="w-8 h-8 bg-yellow-200 rounded-full"></div>
+                  <div className="w-10 h-10 rounded-full bg-amber-100" />
                   <div className="space-y-2">
-                    <div className="w-24 h-4 bg-yellow-200 rounded"></div>
-                    <div className="w-32 h-3 bg-yellow-200 rounded"></div>
+                    <div className="h-4 w-36 rounded bg-amber-100" />
+                    <div className="h-3 w-48 rounded bg-amber-100" />
                   </div>
                 </div>
               </div>
             ))}
           </div>
         ) : filteredSignals.length > 0 ? (
-          <div className="space-y-4">
-            {filteredSignals.map((signal) => {
-              const game = games.find(g => g.id === signal.gameId);
-              const house = houses.find(h => h.id === signal.houseId);
-              
-              if (!game || !house) return null;
-              
-              return (
-                <div key={signal.id} className="relative">
-                  <div className="absolute -top-2 -right-2 z-10">
-                    <Badge className="bg-yellow-500 text-white border-none">
-                      <Crown className="w-3 h-3 mr-1" />
-                      VIP
-                    </Badge>
-                  </div>
-                  <SignalCard
-                    signal={signal}
-                    game={game}
-                    house={house}
-                  />
-                </div>
-              );
-            })}
-          </div>
+          <div className="space-y-4">{filteredSignals.map(renderCard)}</div>
         ) : (
-          <div className="text-center py-12">
-            <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Lock className="w-8 h-8 text-yellow-600" />
+          <div className="rounded-xl border border-amber-100 bg-card/80 p-10 text-center">
+            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-amber-100">
+              <Lock className="w-8 h-8 text-amber-600" />
             </div>
             <h3 className="text-xl font-semibold text-foreground mb-2">
-              {filter === 'all' ? 'Nenhum sinal VIP ativo' : 'Nenhum sinal VIP encontrado'}
+              {filter === "all" ? "Nenhum sinal VIP ativo" : "Nenhum sinal VIP neste filtro"}
             </h3>
             <p className="text-muted-foreground mb-6">
-              {filter === 'all' 
-                ? 'Aguarde, sinais VIP de alta precisão serão gerados'
-                : 'Tente outro filtro ou aguarde novos sinais VIP'
-              }
+              Aguarde alguns minutos para que novos sinais sejam gerados ou ajuste o filtro selecionado.
             </p>
-            <div className="space-y-3">
-              <Button 
-                variant="outline" 
-                onClick={refreshData} 
+            <div className="flex flex-col items-center gap-3">
+              <Button
+                variant="outline"
+                onClick={refreshData}
                 disabled={isLoading}
-                className="border-yellow-300 text-yellow-700 hover:bg-yellow-50"
+                className="border-amber-200 text-amber-700 hover:bg-amber-100"
               >
                 <RefreshCw className={cn("w-4 h-4 mr-2", isLoading && "animate-spin")} />
-                Verificar Sinais VIP
+                Atualizar sinais
               </Button>
-              
-              {filter !== 'all' && (
-                <div>
-                  <Button 
-                    variant="ghost" 
-                    onClick={() => setFilter('all')}
-                    className="text-sm text-yellow-700 hover:bg-yellow-50"
-                  >
-                    Ver todos os sinais VIP
-                  </Button>
-                </div>
+              {filter !== "all" && (
+                <Button
+                  variant="ghost"
+                  onClick={() => setFilter("all")}
+                  className="text-sm text-amber-700 hover:bg-amber-100/60"
+                >
+                  Ver todos os sinais VIP
+                </Button>
               )}
-            </div>
-          </div>
-        )}
-
-        {/* VIP Legend */}
-        {vipSignals.length > 0 && (
-          <div className="mt-8 p-4 bg-gradient-to-r from-yellow-50 to-amber-50 rounded-lg border border-yellow-200">
-            <h3 className="font-semibold text-yellow-800 mb-3 flex items-center gap-2">
-              <Crown className="w-4 h-4" />
-              Sinais VIP - Precisão Elite
-            </h3>
-            <div className="space-y-2 text-sm">
-              <div className="flex items-center gap-3">
-                <span className="text-yellow-600">👑</span>
-                <span className="text-yellow-700">
-                  <strong>Sinais VIP:</strong> Apenas sinais com precisão ≥ 85%
-                </span>
-              </div>
-              <div className="flex items-center gap-3">
-                <span className="text-yellow-600">⭐</span>
-                <span className="text-yellow-700">
-                  <strong>Elite:</strong> Sinais premium com precisão ≥ 90%
-                </span>
-              </div>
             </div>
           </div>
         )}

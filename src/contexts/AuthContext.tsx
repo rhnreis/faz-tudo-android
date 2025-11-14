@@ -1,7 +1,6 @@
-import { createContext, useContext, useEffect, useState } from 'react';
-import { User, Session } from '@supabase/supabase-js';
-import { supabase } from '@/integrations/supabase/client';
+import React, { createContext, useContext, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { localLogin, localRegister } from '@/lib/localApi';
 
 interface Profile {
   id: string;
@@ -13,119 +12,90 @@ interface Profile {
 }
 
 interface AuthContextType {
-  user: User | null;
-  session: Session | null;
+  user: any;
+  session: any;
   profile: Profile | null;
   loading: boolean;
   signUp: (email: string, password: string, fullName: string) => Promise<{ error: any }>;
   signIn: (email: string, password: string) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
   hasAccess: (feature: 'games' | 'signals' | 'vip-signals') => boolean;
+  isMaster: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
+  const [user, setUser] = useState<any>(null);
+  const [session, setSession] = useState<any>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
+  // start as loading until we restore persisted auth (prevents ProtectedRoute redirect)
   const [loading, setLoading] = useState(true);
-  const navigate = useNavigate();
-
-  useEffect(() => {
-    // Set up auth state listener first
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
-        
-        // Fetch profile when user signs in
-        if (session?.user) {
-          setTimeout(() => {
-            fetchProfile(session.user.id);
-          }, 0);
-        } else {
-          setProfile(null);
-        }
-      }
-    );
-
-    // Then check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        fetchProfile(session.user.id);
-      }
-      setLoading(false);
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
-
-  const fetchProfile = async (userId: string) => {
+  // Carrega estado do localStorage para persistência simples
+  React.useEffect(() => {
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .single();
-
-      if (error) throw error;
-      setProfile(data);
-    } catch (error) {
-      console.error('Error fetching profile:', error);
+      const raw = localStorage.getItem('auth');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        setUser(parsed.user || null);
+        setProfile(parsed.profile || null);
+        setSession(parsed.session || null);
+      }
+    } catch (e) {
+      // ignore
+    } finally {
+      // finished restoring
+      setLoading(false);
     }
-  };
+  }, []);
+  const navigate = useNavigate();
+  const isMaster = user?.email === 'rodrigohnreis@gmail.com';
 
   const signUp = async (email: string, password: string, fullName: string) => {
-    const redirectUrl = `${window.location.origin}/dashboard`;
-    
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: redirectUrl,
-        data: {
-          full_name: fullName
-        }
-      }
-    });
-    
-    return { error };
+    const result = await localRegister(email, password);
+    if (result.error) return { error: result.error };
+    navigate('/plans');
+    return { error: null };
   };
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password
-    });
-    
-    if (!error) {
-      navigate('/dashboard');
+    setLoading(true);
+    const result = await localLogin(email, password);
+    if (result.error) {
+      setLoading(false);
+      return { error: result.error };
     }
-    
-    return { error };
+    const userObj = { id: result.id, email: result.email };
+    setUser(userObj);
+    setProfile(result.profile || null);
+    setSession(result.session || null);
+    // Persiste no localStorage
+    try { 
+      localStorage.setItem('auth', JSON.stringify({ user: userObj, profile: result.profile || null, session: result.session || null }));
+      if (userObj.email === 'rodrigohnreis@gmail.com') localStorage.setItem('isMaster','1'); else localStorage.removeItem('isMaster');
+    } catch (e) {}
+    setLoading(false);
+    navigate('/dashboard');
+    return { error: null };
   };
 
   const signOut = async () => {
-    await supabase.auth.signOut();
     setProfile(null);
+    setUser(null);
+    setSession(null);
+    try { localStorage.removeItem('auth'); } catch (e) {}
+    try { localStorage.removeItem('isMaster'); } catch (e) {}
     navigate('/');
   };
 
   const hasAccess = (feature: 'games' | 'signals' | 'vip-signals'): boolean => {
     if (!profile) return false;
-
-    // Check if plan has expired
     if (profile.plan_expires_at) {
       const expiryDate = new Date(profile.plan_expires_at);
       if (expiryDate < new Date()) {
         return false;
       }
     }
-
-    // Access control based on plan
     switch (feature) {
       case 'games':
         return ['basico', 'premium', 'vip'].includes(profile.plan);
@@ -148,7 +118,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         signUp, 
         signIn, 
         signOut, 
-        hasAccess 
+        hasAccess,
+        isMaster
       }}
     >
       {children}

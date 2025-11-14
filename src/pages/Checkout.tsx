@@ -1,331 +1,345 @@
-import { useState, useEffect } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
-import { 
-  ArrowLeft, 
-  CreditCard, 
-  Shield, 
-  Clock, 
-  Copy, 
+import {
+  ArrowLeft,
+  CreditCard,
+  Shield,
+  Clock,
+  Copy,
   CheckCircle,
-  QrCode 
+  QrCode,
+  Sparkles,
+  Crown,
 } from "lucide-react";
+import { getPlans } from "@/lib/localDbApi";
 
 interface Plan {
-  id: string;
+  id: number;
   name: string;
-  price: number;
-  duration: string;
-  features: string[];
+  description?: string | null;
+  price: number | string;
 }
 
-const plans: { [key: string]: Plan } = {
-  basic: {
-    id: "basic",
-    name: "Plano Básico",
-    price: 29.90,
-    duration: "7 dias",
-    features: ["Sinais básicos diários", "3 casas de apostas", "Suporte WhatsApp"]
-  },
-  premium: {
-    id: "premium", 
-    name: "Plano Premium",
-    price: 79.90,
-    duration: "30 dias",
-    features: ["Sinais premium", "Todas as casas", "Suporte 24/7", "Grupo VIP"]
-  },
-  vip: {
-    id: "vip",
-    name: "VIP Diamond",
-    price: 149.90,
-    duration: "30 dias", 
-    features: ["Todos recursos Premium", "Calls ao vivo", "Suporte 1:1", "E-book grátis"]
-  }
+const formatPrice = (value: number | string) => {
+  const normalized =
+    typeof value === "number" ? value : Number(String(value).replace(",", "."));
+  if (Number.isNaN(normalized)) return "R$ --";
+  return normalized.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 };
 
-export const Checkout = () => {
-  const { planId } = useParams<{ planId: string }>();
+const defaultPerks: Record<string, string[]> = {
+  básico: [
+    "Alertas calibrados com confiança mínima de 70%",
+    "Painel com atualização a cada 30 segundos",
+    "Suporte em horário comercial",
+  ],
+  premium: [
+    "Tudo do Básico + filtros avançados",
+    "Confiança média acima de 82%",
+    "Suporte prioridade via WhatsApp",
+  ],
+  vip: [
+    "Tudo do Premium + sinais exclusivos",
+    "Precisão média superior a 90%",
+    "Atendimento dedicado e acompanhamento diário",
+  ],
+};
+
+const normalizePlanDuration = (name: string) => {
+  const lower = name.toLowerCase();
+  if (lower.includes("vip")) return "90 dias";
+  if (lower.includes("premium")) return "30 dias";
+  return "7 dias";
+};
+
+export default function Checkout() {
+  const { planId } = useParams<{ planId?: string }>();
+  const navigate = useNavigate();
+  const { toast } = useToast();
+
+  const [plans, setPlans] = useState<Plan[]>([]);
+  const [plan, setPlan] = useState<Plan | null>(null);
+  const [loadingPlan, setLoadingPlan] = useState(true);
+
   const [paymentMethod, setPaymentMethod] = useState<"pix" | "card">("pix");
   const [isProcessing, setIsProcessing] = useState(false);
   const [pixCode, setPixCode] = useState("");
   const [showPixCode, setShowPixCode] = useState(false);
+
   const [customerData, setCustomerData] = useState({
     name: "",
     email: "",
     phone: "",
-    cpf: ""
+    cpf: "",
   });
-  const { toast } = useToast();
-
-  const plan = planId ? plans[planId] : null;
 
   useEffect(() => {
-    if (!plan) {
-      toast({
-        title: "Plano não encontrado",
-        description: "Redirecionando para seleção de planos...",
-        variant: "destructive",
-      });
-    }
-  }, [plan, toast]);
+    const fetchPlans = async () => {
+      setLoadingPlan(true);
+      try {
+        const response = await getPlans();
+        setPlans(response);
 
-  const handleInputChange = (field: string, value: string) => {
+        if (response.length === 0) {
+          setPlan(null);
+          toast({
+            title: "Nenhum plano disponível",
+            description: "Cadastre planos no painel administrativo para habilitar o checkout.",
+            variant: "destructive",
+          });
+          return;
+        }
+
+        const byId = response.find(p => String(p.id) === planId);
+        const fallbackByName = planId
+          ? response.find(p => p.name?.toLowerCase().includes(planId.toLowerCase()))
+          : undefined;
+
+        setPlan(byId ?? fallbackByName ?? response[0]);
+      } catch (error: unknown) {
+        toast({
+          title: "Erro ao carregar plano",
+          description: "Não foi possível carregar as informações do plano selecionado.",
+          variant: "destructive",
+        });
+      } finally {
+        setLoadingPlan(false);
+      }
+    };
+
+    fetchPlans();
+  }, [planId, toast]);
+
+  const planPrice = useMemo(() => (plan ? formatPrice(plan.price) : "R$ --"), [plan]);
+  const planDuration = useMemo(
+    () => (plan ? normalizePlanDuration(plan.name) : "30 dias"),
+    [plan]
+  );
+
+  const planPerks = useMemo(() => {
+    if (!plan) return [];
+    const key = plan.name.toLowerCase();
+    return defaultPerks[key] ?? [
+      "Acesso integral ao painel de sinais",
+      "Atualizações em tempo real durante a vigência do plano",
+      "Suporte via WhatsApp durante todo o período ativo",
+    ];
+  }, [plan]);
+
+  const handleInputChange = (field: keyof typeof customerData, value: string) => {
     setCustomerData(prev => ({ ...prev, [field]: value }));
   };
 
   const generatePixPayment = async () => {
+    if (!plan) return;
     setIsProcessing(true);
-
     try {
-      // TODO: Integrar com API do Mercado Pago
-      // Simular geração do código PIX
-      const mockPixCode = "00020101021126580014br.gov.bcb.pix0136123e4567-e12b-12d1-a456-426614174000520400005303986540" + plan?.price.toFixed(2) + "5802BR5925SinaisVIP6009SAO PAULO62070503***6304";
-      
-      setTimeout(() => {
-        setPixCode(mockPixCode);
-        setShowPixCode(true);
-        setIsProcessing(false);
-        
-        toast({
-          title: "PIX gerado com sucesso!",
-          description: "Copie o código ou escaneie o QR Code para pagar.",
-        });
-      }, 2000);
-    } catch (error) {
+      const API_BASE = import.meta.env.VITE_API_URL ?? "";
+      const response = await fetch(`${API_BASE}/api/create-payment`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ planId: plan.id, customer: customerData, method: "pix" }),
+      });
+      if (!response.ok) throw new Error("Falha ao gerar PIX");
+      const data = await response.json();
+      setPixCode(data.pix_code ?? "");
+      setShowPixCode(true);
+      toast({
+        title: "PIX gerado com sucesso!",
+        description: "Copie o código ou utilize o QR Code para finalizar o pagamento.",
+      });
+    } catch (error: unknown) {
       toast({
         title: "Erro ao gerar PIX",
-        description: "Tente novamente em alguns instantes.",
+        description: "Tente novamente em instantes ou verifique sua conexão.",
         variant: "destructive",
       });
+    } finally {
       setIsProcessing(false);
     }
   };
 
   const copyPixCode = () => {
-    navigator.clipboard.writeText(pixCode);
+    if (!pixCode) return;
+    navigator.clipboard.writeText(pixCode).catch(() => undefined);
     toast({
-      title: "Código copiado!",
-      description: "Cole no seu banco para efetuar o pagamento.",
+      title: "Código copiado",
+      description: "Cole no aplicativo do seu banco para concluir o pagamento.",
     });
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!plan) return;
     if (paymentMethod === "pix") {
       await generatePixPayment();
     } else {
-      // TODO: Implementar pagamento com cartão
       toast({
-        title: "Pagamento com cartão",
-        description: "Funcionalidade em desenvolvimento.",
+        title: "Cartão em desenvolvimento",
+        description: "No momento aceitamos apenas PIX.",
         variant: "destructive",
       });
     }
   };
 
+  if (loadingPlan) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-muted-foreground">Carregando informações do plano...</div>
+      </div>
+    );
+  }
+
   if (!plan) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <Card className="border-border">
-          <CardContent className="p-6 text-center">
-            <p className="text-muted-foreground mb-4">Plano não encontrado</p>
-            <Link to="/plans">
-              <Button>Voltar para Planos</Button>
-            </Link>
-          </CardContent>
+        <Card className="p-8 text-center">
+          <CardTitle className="text-xl mb-2">Plano não encontrado</CardTitle>
+          <CardDescription className="mb-6">
+            Não foi possível localizar o plano solicitado. Escolha novamente na página de planos.
+          </CardDescription>
+          <Button asChild>
+            <Link to="/plans">Voltar para os planos</Link>
+          </Button>
         </Card>
       </div>
     );
   }
 
+  const isVip = plan.name.toLowerCase().includes("vip");
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-card">
-      {/* Header */}
-      <div className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-50">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <Link to="/plans" className="flex items-center space-x-2 text-foreground hover:text-highlight">
-              <ArrowLeft className="w-5 h-5" />
-              <span>Voltar</span>
-            </Link>
-            <h1 className="text-xl font-bold text-foreground">Finalizar Compra</h1>
-            <div />
-          </div>
+      <div className="border-b border-border bg-card/60 backdrop-blur sticky top-0 z-40">
+        <div className="container mx-auto px-4 py-4 flex items-center justify-between gap-4">
+          <Button variant="ghost" size="sm" onClick={() => navigate(-1)}>
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Voltar
+          </Button>
+          <Badge variant="outline" className="border-primary/40 text-primary">
+            Checkout seguro
+          </Badge>
         </div>
       </div>
 
-      <div className="container mx-auto px-4 py-8">
-        <div className="max-w-4xl mx-auto grid lg:grid-cols-2 gap-8">
-          {/* Resumo do Pedido */}
-          <Card className="border-border shadow-elevated h-fit">
-            <CardHeader>
-              <CardTitle className="text-foreground">Resumo do Pedido</CardTitle>
-              <CardDescription className="text-muted-foreground">
-                Confira os detalhes da sua compra
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-4">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <h3 className="font-semibold text-foreground">{plan.name}</h3>
-                    <p className="text-sm text-muted-foreground">Duração: {plan.duration}</p>
-                  </div>
-                  <Badge className="bg-primary/20 text-primary">Premium</Badge>
-                </div>
-
-                <div className="space-y-2">
-                  <p className="text-sm font-medium text-foreground">Inclui:</p>
-                  <ul className="space-y-1">
-                    {plan.features.map((feature, index) => (
-                      <li key={index} className="text-sm text-muted-foreground flex items-center space-x-2">
-                        <CheckCircle className="w-4 h-4 text-success" />
-                        <span>{feature}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-
-              <Separator className="bg-border" />
-
-              <div className="space-y-2">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Subtotal</span>
-                  <span className="text-foreground">R$ {plan.price.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Desconto</span>
-                  <span className="text-success">-R$ 0,00</span>
-                </div>
-                <Separator className="bg-border" />
-                <div className="flex justify-between text-lg font-semibold">
-                  <span className="text-foreground">Total</span>
-                  <span className="text-foreground">R$ {plan.price.toFixed(2)}</span>
-                </div>
-              </div>
-
-              <div className="bg-success/10 p-4 rounded-lg border border-success/20">
-                <div className="flex items-center space-x-2 text-success">
-                  <Shield className="w-5 h-5" />
-                  <span className="font-medium">Garantia de 7 dias</span>
-                </div>
-                <p className="text-sm text-success/80 mt-1">
-                  Não ficou satisfeito? Devolvemos 100% do valor.
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Formulário de Pagamento */}
+      <div className="container mx-auto px-4 py-10">
+        <div className="grid gap-6 lg:grid-cols-[1.6fr_1fr]">
           <Card className="border-border shadow-elevated">
-            <CardHeader>
-              <CardTitle className="text-foreground">Dados para Pagamento</CardTitle>
-              <CardDescription className="text-muted-foreground">
-                Preencha seus dados para finalizar a compra
-              </CardDescription>
+            <CardHeader className="space-y-2 border-b border-border/60">
+              <div className="flex items-center gap-3">
+                <div
+                  className={`flex h-12 w-12 items-center justify-center rounded-2xl text-white ${
+                    isVip
+                      ? "bg-gradient-to-br from-primary to-rose-500"
+                      : "bg-gradient-to-br from-primary to-secondary"
+                  }`}
+                >
+                  {isVip ? <Crown className="h-6 w-6" /> : <Sparkles className="h-6 w-6" />}
+                </div>
+                <div>
+                  <CardTitle className="text-2xl text-foreground">{plan.name}</CardTitle>
+                  <CardDescription className="text-sm text-muted-foreground">
+                    {plan.description || "Plano personalizado com acesso completo às funcionalidades."}
+                  </CardDescription>
+                </div>
+              </div>
+              <div className="flex items-end gap-2">
+                <p className="text-4xl font-bold text-foreground">{planPrice}</p>
+                <span className="text-sm text-muted-foreground">por {planDuration}</span>
+              </div>
             </CardHeader>
-            <CardContent>
-              {!showPixCode ? (
-                <form onSubmit={handleSubmit} className="space-y-6">
-                  {/* Dados do Cliente */}
-                  <div className="space-y-4">
-                    <h3 className="font-medium text-foreground">Dados Pessoais</h3>
-                    
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="name" className="text-foreground">Nome Completo</Label>
-                        <Input
-                          id="name"
-                          value={customerData.name}
-                          onChange={(e) => handleInputChange("name", e.target.value)}
-                          required
-                          className="bg-input border-border text-foreground"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="cpf" className="text-foreground">CPF</Label>
-                        <Input
-                          id="cpf"
-                          placeholder="000.000.000-00"
-                          value={customerData.cpf}
-                          onChange={(e) => handleInputChange("cpf", e.target.value)}
-                          required
-                          className="bg-input border-border text-foreground"
-                        />
-                      </div>
-                    </div>
 
+            <CardContent className="space-y-8 pt-6">
+              {!showPixCode ? (
+                <form className="space-y-6" onSubmit={handleSubmit}>
+                  <div className="grid gap-4 sm:grid-cols-2">
                     <div className="space-y-2">
-                      <Label htmlFor="email" className="text-foreground">Email</Label>
+                      <Label htmlFor="name">Nome completo</Label>
+                      <Input
+                        id="name"
+                        placeholder="Como está no documento"
+                        value={customerData.name}
+                        onChange={event => handleInputChange("name", event.target.value)}
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="email">E-mail</Label>
                       <Input
                         id="email"
                         type="email"
+                        placeholder="exemplo@email.com"
                         value={customerData.email}
-                        onChange={(e) => handleInputChange("email", e.target.value)}
+                        onChange={event => handleInputChange("email", event.target.value)}
                         required
-                        className="bg-input border-border text-foreground"
                       />
                     </div>
-
                     <div className="space-y-2">
-                      <Label htmlFor="phone" className="text-foreground">WhatsApp</Label>
+                      <Label htmlFor="phone">WhatsApp</Label>
                       <Input
                         id="phone"
                         placeholder="(11) 99999-9999"
                         value={customerData.phone}
-                        onChange={(e) => handleInputChange("phone", e.target.value)}
+                        onChange={event => handleInputChange("phone", event.target.value)}
                         required
-                        className="bg-input border-border text-foreground"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="cpf">CPF</Label>
+                      <Input
+                        id="cpf"
+                        placeholder="000.000.000-00"
+                        value={customerData.cpf}
+                        onChange={event => handleInputChange("cpf", event.target.value)}
+                        required
                       />
                     </div>
                   </div>
 
-                  <Separator className="bg-border" />
+                  <Separator />
 
-                  {/* Forma de Pagamento */}
                   <div className="space-y-4">
-                    <h3 className="font-medium text-foreground">Forma de Pagamento</h3>
-                    
+                    <h3 className="font-medium text-foreground">Forma de pagamento</h3>
                     <div className="grid grid-cols-2 gap-4">
                       <Button
                         type="button"
                         variant={paymentMethod === "pix" ? "default" : "outline"}
                         onClick={() => setPaymentMethod("pix")}
-                        className="h-auto p-4 flex flex-col items-center space-y-2"
+                        className="h-auto p-4 flex flex-col items-center gap-2"
                       >
                         <QrCode className="w-6 h-6" />
-                        <div className="text-center">
-                          <p className="font-semibold">PIX</p>
-                          <p className="text-xs opacity-80">Aprovação imediata</p>
-                        </div>
+                        <span className="font-semibold">PIX</span>
+                        <span className="text-xs">Confirmação imediata</span>
                       </Button>
-
                       <Button
                         type="button"
                         variant={paymentMethod === "card" ? "default" : "outline"}
                         onClick={() => setPaymentMethod("card")}
-                        className="h-auto p-4 flex flex-col items-center space-y-2"
+                        className="h-auto p-4 flex flex-col items-center gap-2"
                       >
                         <CreditCard className="w-6 h-6" />
-                        <div className="text-center">
-                          <p className="font-semibold">Cartão</p>
-                          <p className="text-xs opacity-80">Crédito/Débito</p>
-                        </div>
+                        <span className="font-semibold">Cartão</span>
+                        <span className="text-xs">Em breve</span>
                       </Button>
                     </div>
                   </div>
 
-                  <Button 
-                    type="submit" 
-                    className="w-full bg-gradient-primary hover:opacity-90 text-primary-foreground font-semibold"
+                  <Button
+                    type="submit"
+                    className="w-full bg-gradient-primary text-primary-foreground font-semibold hover:opacity-90"
                     disabled={isProcessing}
                   >
                     {isProcessing ? (
@@ -334,72 +348,89 @@ export const Checkout = () => {
                         Gerando pagamento...
                       </>
                     ) : (
-                      `Pagar R$ ${plan.price.toFixed(2)} via ${paymentMethod.toUpperCase()}`
+                      `Pagar ${planPrice} via ${paymentMethod.toUpperCase()}`
                     )}
                   </Button>
                 </form>
               ) : (
-                /* PIX Code Display */
                 <div className="space-y-6 text-center">
                   <div className="space-y-2">
-                    <h3 className="text-xl font-semibold text-foreground">PIX Gerado!</h3>
+                    <h3 className="text-xl font-semibold text-foreground">PIX gerado!</h3>
                     <p className="text-muted-foreground">
-                      Escaneie o QR Code ou copie o código para pagar
+                      Escaneie o QR Code ou copie o código Pix para concluir sua assinatura.
                     </p>
                   </div>
-
-                  {/* QR Code Placeholder */}
-                  <div className="w-64 h-64 mx-auto bg-card border border-border rounded-lg flex items-center justify-center">
-                    <div className="text-center space-y-2">
-                      <QrCode className="w-16 h-16 mx-auto text-muted-foreground" />
-                      <p className="text-sm text-muted-foreground">QR Code PIX</p>
+                  <div className="mx-auto flex h-60 w-60 items-center justify-center rounded-xl border border-border bg-card/60">
+                    <div className="space-y-2 text-muted-foreground">
+                      <QrCode className="mx-auto w-16 h-16" />
+                      <p className="text-sm">QR Code gerado</p>
                     </div>
                   </div>
-
-                  {/* PIX Code */}
                   <div className="space-y-2">
-                    <Label className="text-foreground">Código PIX (Copia e Cola)</Label>
-                    <div className="flex items-center space-x-2">
-                      <Input
-                        value={pixCode}
-                        readOnly
-                        className="bg-input border-border text-foreground text-xs"
-                      />
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={copyPixCode}
-                        className="shrink-0"
-                      >
+                    <Label className="text-foreground">Código PIX (copia e cola)</Label>
+                    <div className="flex gap-2">
+                      <Input value={pixCode} readOnly className="text-xs" />
+                      <Button type="button" variant="outline" onClick={copyPixCode}>
                         <Copy className="w-4 h-4" />
                       </Button>
                     </div>
                   </div>
-
-                  <div className="bg-warning/10 p-4 rounded-lg border border-warning/20">
-                    <div className="flex items-center space-x-2 text-warning">
-                      <Clock className="w-5 h-5" />
-                      <span className="font-medium">Aguardando pagamento</span>
+                  <div className="rounded-lg border border-warning/40 bg-warning/10 p-4 flex items-start gap-3 text-left">
+                    <Clock className="w-5 h-5 text-warning" />
+                    <div>
+                      <p className="font-semibold text-warning">Pagamento aguardando confirmação</p>
+                      <p className="text-sm text-warning/80">
+                        O código PIX expira em 30 minutos. Assim que o pagamento for confirmado, o acesso ao plano será liberado automaticamente.
+                      </p>
                     </div>
-                    <p className="text-sm text-warning/80 mt-1">
-                      O PIX tem validade de 30 minutos. Após o pagamento, o acesso será liberado automaticamente.
-                    </p>
                   </div>
-
-                  <Button 
-                    onClick={() => setShowPixCode(false)}
-                    variant="outline"
-                    className="w-full"
-                  >
-                    Voltar
+                  <Button type="button" variant="outline" onClick={() => setShowPixCode(false)}>
+                    Gerar novamente
                   </Button>
                 </div>
               )}
             </CardContent>
           </Card>
+
+          <div className="space-y-6">
+            <Card className="border-border shadow-card">
+              <CardHeader>
+                <CardTitle className="text-lg">O que você recebe</CardTitle>
+                <CardDescription>Resumo dos benefícios incluídos neste plano.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {planPerks.map((perk, index) => (
+                  <div key={index} className="flex items-start gap-2 text-sm text-muted-foreground">
+                    <CheckCircle className="w-4 h-4 text-primary mt-0.5" />
+                    <span>{perk}</span>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+
+            <Card className="border-border shadow-card">
+              <CardHeader>
+                <CardTitle className="text-lg">Pagamento seguro</CardTitle>
+                <CardDescription>Dados protegidos e confirmação instantânea.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3 text-sm text-muted-foreground">
+                <div className="flex items-start gap-2">
+                  <Shield className="w-4 h-4 text-primary mt-0.5" />
+                  <span>Conexão criptografada e monitorada em tempo real.</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <Clock className="w-4 h-4 text-primary mt-0.5" />
+                  <span>Acesso liberado automaticamente após a confirmação do PIX.</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <ArrowLeft className="w-4 h-4 text-primary mt-0.5" />
+                  <span>Suporte dedicado caso precise ajustar seu cadastro.</span>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </div>
       </div>
     </div>
   );
-};
+}

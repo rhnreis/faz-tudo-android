@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -23,7 +24,8 @@ export const Settings = () => {
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [vibration, setVibration] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
-  const { user, profile, signOut } = useAuth();
+  const { user, profile, signOut, isMaster } = useAuth();
+  const navigate = useNavigate();
 
   const getPlanBadgeColor = (plan: string) => {
     switch (plan) {
@@ -49,6 +51,24 @@ export const Settings = () => {
 
   return (
     <div className="min-h-screen bg-background pb-24">
+      {isMaster && (
+        <div className="p-4">
+          <Card className="p-4 mb-6">
+            <h3 className="font-bold text-lg mb-2">Painel Administrativo</h3>
+            <div className="space-y-2">
+              <Button variant="outline" className="w-full" onClick={() => navigate('/admin/users')}>
+                Gerenciar Usuários
+              </Button>
+              <Button variant="outline" className="w-full" onClick={() => navigate('/admin/plans')}>
+                Gerenciar Planos
+              </Button>
+              <Button variant="outline" className="w-full" onClick={() => navigate('/admin/mercadopago')}>
+                Configurar Mercado Pago
+              </Button>
+            </div>
+          </Card>
+        </div>
+      )}
       {/* Header */}
       <div className="bg-gradient-primary p-6 pb-8">
         <div className="flex items-center gap-3 mb-4">
